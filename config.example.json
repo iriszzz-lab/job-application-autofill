@@ -1,0 +1,7 @@
+{
+  "workspace_root": ".",
+  "project_directory": ".",
+  "profile_file": "private/autofill-profile.json",
+  "python_executable": ".venv/Scripts/python.exe",
+  "cdp_endpoint": "http://127.0.0.1:9333"
+}

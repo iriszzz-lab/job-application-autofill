@@ -50,10 +50,11 @@ class ControlContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractError, 'missing'):
             assert_registry(current)
 
-    def test_personal_values_are_ordinary_values(self):
+    def test_credentials_are_removed_while_authorized_identity_values_remain(self):
         profile = {'password': 'test-password', 'identity_document_number': 'test-id'}
-        self.assertEqual(redacted_profile(profile), profile)
-        self.assertEqual(json_value(profile, '/password'), profile['password'])
+        self.assertEqual(redacted_profile(profile), {'identity_document_number': 'test-id'})
+        with self.assertRaises(ContractError):
+            json_value(profile, '/password')
         self.assertEqual(compile_control_target(profile, '/identity_document_number', 'plain_text_probe_v1'),
                          {'kind': 'text', 'text': 'test-id'})
 

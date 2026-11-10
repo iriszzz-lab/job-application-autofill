@@ -3,6 +3,7 @@ import {mkdir,readFile,writeFile,rename,readdir,rmdir} from 'node:fs/promises';
 import {join} from 'node:path';
 import {isDeepStrictEqual} from 'node:util';
 import {readModuleDOM} from './rules/dom.mjs';
+import {readSubmissionCandidates} from './submission_controls.mjs';
 
 async function atomic(path,value){
  const temporary=`${path}.tmp`;
@@ -12,6 +13,7 @@ async function atomic(path,value){
 export async function captureSubmissionEvidence(session){
  return JSON.parse(JSON.stringify({target:{browser_id:session.browserId,tab_id:session.tab.id,url:await session.tab.url()},
   snapshot:await session.tab.playwright.evaluate(readModuleDOM,{moduleSelector:'body'}),
+  candidate_controls:await session.tab.playwright.evaluate(readSubmissionCandidates),
   text:await session.tab.playwright.locator('body').innerText({timeoutMs:5000})}));
 }
 export async function releaseBlockedSubmissionReservation(runDirectory,phase='submit'){
@@ -32,12 +34,12 @@ export function assertSubmissionReview(plan,live,summary){
  if((summary.coverage_gaps||[]).some(g=>g.reason!=='scope_draft'))throw new Error('application_coverage_blocked');
  if(!plan.job?.company || !plan.job.id || !plan.job.title || !plan.job.detail_url)throw new Error('verified_job_required');
  const review=plan.review;
- if(!review || review.model!=='gpt-6-luna' || review.approved!==true ||
+ if(!review || (typeof review.model!=='string' || !review.model.trim() || ['program','main'].includes(review.model)) || review.approved!==true ||
     review.coverage_complete!==true || review.eligible!==true || review.history_clear!==true ||
     !Array.isArray(review.issues) || review.issues.length)throw new Error('independent_submission_review_required');
  if(!isDeepStrictEqual(review.evidence,live))throw new Error('submission_review_stale');
  if(!review.job_evidence || !review.history_evidence || !review.profile_evidence)throw new Error('submission_sources_required');
- if(!plan.action?.selector || !/^(预览并提交|提交简历|投递简历|确认提交|确认投递|提交申请|Submit|Apply)$/i.test(plan.action.text))throw new Error('reviewed_submission_control_required');
+ if(!plan.action?.selector || !/^(预览并提交|提交简历|投递简历|确认提交|确认投递|提交申请|确认申请|立即申请|立即投递|提交|投递|submit(?: application)?|apply(?: now)?|send application|confirm(?: application| submission)?)$/i.test(plan.action.text.replace(/\s+/g,' ')))throw new Error('reviewed_submission_control_required');
  if(plan.outcome_mode!=='independent_observation' && (!plan.success?.selector || !plan.success.text))throw new Error('success_evidence_rule_required');
 }
 async function assertOriginalWritersSettled(runDirectory){
@@ -60,7 +62,7 @@ async function assertOriginalWritersSettled(runDirectory){
 async function visibleExact(session,rule){
  const locator=session.tab.playwright.locator(rule.selector);
  if(await locator.count()!==1 || !await locator.isVisible())return false;
- return (await locator.innerText({timeoutMs:3000})).trim()===rule.text;
+ return (rule.input_value?await locator.evaluate(el=>el.value):await locator.innerText({timeoutMs:3000})).trim()===rule.text;
 }
 export async function observeSubmission(session,plan,journal,checkpoint){
  const evidence=await captureSubmissionEvidence(session);
@@ -101,7 +103,7 @@ export async function dispatchReviewedSubmission({session,runDirectory,plan,getS
   if(plan.success && await visibleExact(session,plan.success))throw new Error('preexisting_success_requires_history_reconciliation');
   const button=session.tab.playwright.locator(plan.action.selector);
   if(await button.count()!==1 || !await button.isVisible() || !await button.isEnabled() ||
-     (await button.innerText({timeoutMs:3000})).trim()!==plan.action.text)throw new Error('submission_control_changed');
+     (plan.action.input_value?await button.evaluate(el=>el.value):await button.innerText({timeoutMs:3000})).trim()!==plan.action.text)throw new Error('submission_control_changed');
   // Bind the values again immediately before persisting dispatch.
   if(!isDeepStrictEqual(live,await capture(session)))throw new Error('submission_values_changed');
   journal.status='pending';journal.plan=plan;journal.before=live;
@@ -122,7 +124,7 @@ export async function acceptReviewedSubmissionOutcome({session,runDirectory,phas
  const evidence=await captureSubmissionEvidence(session);
  if(!isDeepStrictEqual(review?.evidence,evidence) || evidence.target.tab_id!==journal.before.target.tab_id ||
     evidence.target.browser_id!==journal.before.target.browser_id)throw new Error('outcome_review_stale');
- if(review.model!=='gpt-6-luna' || review.approved!==true || !Array.isArray(review.issues) || review.issues.length ||
+ if((typeof review.model!=='string' || !review.model.trim() || ['program','main'].includes(review.model)) || review.approved!==true || !Array.isArray(review.issues) || review.issues.length ||
     !['submitted','confirmation'].includes(review.outcome) || !review.website_evidence?.selector || !review.website_evidence.text)
     throw new Error('independent_outcome_review_required');
  if(!await visibleExact(session,review.website_evidence))throw new Error('website_outcome_evidence_changed');

@@ -14,7 +14,7 @@ export function readFrameworkSections(){
  else return null;
  roots=roots.filter(visible).filter((r,i,a)=>a.indexOf(r)===i&&!a.some(x=>x!==r&&x.contains(r)));
  const buttons=[...document.querySelectorAll('button,[role=button]')].filter(visible);
- const saves=buttons.filter(b=>/^(保存简历|暂存)$/.test(text(b)));
+ const saves=buttons.filter(b=>/^(保存简历|暂存|save|save resume|save and continue)$/i.test(text(b)));
  const sections=roots.map((r,index)=>{
   let heading=family==='moka'?r.querySelector(':scope > [class*="blockTitle-"]'):family==='feishu'?r.querySelector('.applyFormModuleWrapper-text'):
     family==='sf'?r.querySelector('.tag-title'):family==='oppo'?r.querySelector('.module-title__label > span'):family==='ant'?r.querySelector('[class*="boxTitleCon"]'):r.closest('.ux-standard-form')?.parentElement?.querySelector('[class*="title"],h3');

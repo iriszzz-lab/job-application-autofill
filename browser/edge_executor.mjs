@@ -23,7 +23,7 @@ import {identityField,identityValue,readIdentityMatch} from './confidential_iden
 import {activateModuleTab,openModuleEditor} from './module_navigation.mjs';
 import {FAILURE_TEXT,FIRST_OPTION} from './fallback_policy.mjs';
 
-const protectedLabel = /(?!)/; // No privacy-based field exclusion.
+const protectedLabel = /(?:password|passwd|\bpwd\b|cookies?|\btoken\b|access[_ -]?token|refresh[_ -]?token|api[_ -]?key|client[_ -]?secret|authorization|\botp\b|verification[_ -]?code|密码|口令|验证码|令牌|密钥)/i;
 const reviewedDOMField = field => Object.fromEntries(Object.entries(field).filter(([key])=>
   !['verified_control','verification_skipped','verification_skip_command'].includes(key)));
 const stableSavedFields = fields => fields.map(f=>Object.fromEntries(Object.entries(reviewedDOMField(f)).filter(([k])=>k!=='controls')));

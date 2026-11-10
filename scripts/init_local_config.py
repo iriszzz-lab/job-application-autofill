@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 
 
-def initialize(project, profile, python):
+def initialize(project, profile, python, semantic_model='gpt-6-luna', review_model='gpt-6-luna'):
     project = Path(project).resolve()
     profile = Path(profile).expanduser().resolve()
     python = Path(python).expanduser().resolve()
@@ -28,6 +28,10 @@ def initialize(project, profile, python):
         raise ValueError('existing_configuration_or_knowledge_not_overwritten')
     runtime_data = json.loads((project / 'templates/local-config.example.json').read_text())
     runtime_data['profile'] = str(profile)
+    for key, model in [('semantic_model', semantic_model), ('review_model', review_model)]:
+        if not isinstance(model, str) or not model.strip() or model in {'program', 'main'}:
+            raise ValueError('explicit_model_name_required')
+        runtime_data[key] = model
     config_data = {'workspace_root': '.', 'project_directory': '.',
                    'profile_file': str(profile), 'python_executable': str(python),
                    'cdp_endpoint': 'http://127.0.0.1:9333'}
@@ -44,9 +48,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--profile', type=Path, required=True)
     parser.add_argument('--python', type=Path, default=Path(sys.executable))
+    parser.add_argument('--semantic-model', default='gpt-6-luna')
+    parser.add_argument('--review-model', default='gpt-6-luna')
     args = parser.parse_args()
     try:
-        result = initialize(Path(__file__).resolve().parents[1], args.profile, args.python)
+        result = initialize(Path(__file__).resolve().parents[1], args.profile, args.python, args.semantic_model, args.review_model)
     except (OSError, ValueError) as error:
         print(json.dumps({'status': 'blocked', 'error': str(error)}, ensure_ascii=False))
         return 1

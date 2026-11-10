@@ -4,7 +4,7 @@ import {mkdtemp,mkdir,readFile,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {assertSubmissionReview,dispatchReviewedSubmission,observeSubmission,captureSubmissionEvidence,releaseBlockedSubmissionReservation,acceptReviewedSubmissionOutcome} from '../browser/submission_supervisor.mjs';
-const live={target:{browser_id:'edge',tab_id:'one',url:'https://example.org/job/1/apply'},snapshot:{fields:[{id:'name',value:'verified'}]},text:'reviewed application'};
+const live={target:{browser_id:'edge',tab_id:'one',url:'https://example.org/job/1/apply'},snapshot:{fields:[{id:'name',value:'verified'}]},text:'reviewed application',candidate_controls:[]};
 const summary={status:'scope_draft',pending_kind:null,manual_review_count:0,coverage_gaps:[]};
 test('captured evidence equals its saved JSON representation',async()=>{
  const session={browserId:'edge',tab:{id:'one',url:async()=>live.target.url,playwright:{evaluate:async()=>({fields:[{id:'name',value:'verified',upload_ready:undefined}]}),locator:()=>({innerText:async()=>live.text})}}};
@@ -90,7 +90,7 @@ test('new website success needs current independent review and never clicks agai
  const folder=join(directory,'writer','submission');await mkdir(folder,{recursive:true});
  const evidence={...structuredClone(live),text:'投递成功'};
  const session={browserId:'edge',tab:{id:'one',url:async()=>live.target.url,playwright:{
-   evaluate:async()=>structuredClone(live.snapshot),
+   evaluate:async fn=>fn.name==='readSubmissionCandidates'?[]:structuredClone(live.snapshot),
    locator:s=>s==='body'?{innerText:async()=>evidence.text}:{count:async()=>1,isVisible:async()=>true,innerText:async()=>evidence.text}}}};
  const journal={status:'awaiting_user_verification',plan:plan(),before:structuredClone(live)};
  await writeFile(join(folder,'confirm-journal.json'),JSON.stringify(journal));

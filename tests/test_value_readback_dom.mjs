@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {readModuleDOM} from '../browser/control_detection.mjs';
 import {runInNewContext} from 'node:vm';
 
-function read({open=false,editable=false,focused=false,committed=null,value='搜索中的文字',placeholder=null,dialog=null,uploadNames=null,uploadBusy=false,uploadDelete=true,udPlain=false,mokaRequired=false}={}){
-  const label={textContent:'政治面貌'};
+function read({open=false,editable=false,focused=false,committed=null,value='搜索中的文字',placeholder=null,dialog=null,uploadNames=null,uploadBusy=false,uploadDelete=true,udPlain=false,mokaRequired=false,credential=false}={}){
+  const label={textContent:credential?'Password':'政治面貌'};
   const item={querySelector:()=>label};
   let field;
   const owner={contains:e=>e===field,querySelectorAll:()=>[],querySelector:()=>null};
@@ -216,4 +216,11 @@ test('phone country code and number input have distinct semantic identities',()=
   const fields=readIdentityFields();
   assert.equal(fields[2].label,'手机号码 国家/地区代码');
   assert.equal(fields[3].label,'手机号码 号码正文');
+});
+
+test('credential values are absent from serialized DOM snapshots',()=>{
+ const field=read({credential:true,value:'SYNTHETIC_PASSWORD',editable:true});
+ assert.equal(field.protected,true);
+ assert.equal(field.value,null);
+ assert.equal(JSON.stringify(field).includes('SYNTHETIC_PASSWORD'),false);
 });

@@ -3,6 +3,7 @@ import {readFile,writeFile,mkdir,appendFile} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {connectEdgeCdp} from '../browser/cdp_connector.mjs';
+import {readSubmissionCandidates} from '../browser/submission_controls.mjs';
 import {runProcess,defaultPython} from '../host/native_playwright_driver.mjs';
 import {captureSubmissionEvidence,dispatchReviewedSubmission,reconcileReviewedSubmission,
  acceptReviewedSubmissionOutcome} from '../browser/submission_supervisor.mjs';
@@ -75,33 +76,7 @@ export async function runReviewedSubmission(config){
    if(journal.status==='submitted')return await successful(journal);
    if(journal.status==='awaiting_user_verification')return {status:journal.status,pageId:config.pageId};
    const evidence=await captureSubmissionEvidence(session);
-   const preview=await session.tab.playwright.evaluate(()=>{
-    const roots=[...document.querySelectorAll('.apply-form-preview')].filter(e=>e.getClientRects().length);
-    if(roots.length!==1)return null;
-    const buttons=[...roots[0].querySelectorAll('button')].filter(e=>e.getClientRects().length&&e.innerText.trim()==='确认提交');
-    return buttons.length===1?{selector:'.apply-form-preview',text:roots[0].innerText,
-     button:{selector:'.apply-form-preview button.btn-ok',text:'确认提交'}}:null;
-   });
-   if(phase==='submit'&&preview){
-    if(journal.click_returned!==true)return {status:'submission_unknown'};
-    const original=await save('original-submit-plan',journal.plan);
-    const gate=await reviewPlan('confirm',evidence,original,preview);
-    if(!gate.verdict.approved)return {status:'independent_preview_review_blocked',issues:gate.verdict.issues};
-    const outcome={...gate.plan.review,phase:'submit',outcome:'confirmation',website_evidence:preview.button};
-    await acceptReviewedSubmissionOutcome({session,runDirectory:run,phase:'submit',review:outcome});
-    confirm=await dispatchReviewedSubmission({session,runDirectory:run,plan:gate.plan,
-     getSummary:()=>command(['status','--run-dir',run])});
-    continue;
-   }
-   const candidates=await session.tab.playwright.evaluate(()=>{
-    const text='已成功提交申请！',elements=[...document.querySelectorAll('body *')].filter(e=>
-     e.getClientRects().length&&e.innerText?.trim()===text&&![...e.children].some(c=>c.innerText?.trim()===text));
-    if(elements.length!==1)return [];
-    const e=elements[0],parts=[];let node=e;
-    while(node&&node!==document.body){const peers=[...node.parentElement.children].filter(x=>x.tagName===node.tagName);
-     parts.unshift(node.tagName.toLowerCase()+':nth-of-type('+(peers.indexOf(node)+1)+')');node=node.parentElement;}
-    return [{id:'observed-success',selector:'body > '+parts.join(' > '),text}];
-   });
+   const candidates=await session.tab.playwright.evaluate(readSubmissionCandidates,{outcomes:true});
    if(!candidates.length)return {status:'submission_unknown'};
    const evidencePath=await save('outcome-evidence',evidence),candidatePath=await save('outcome-candidates',candidates),output=file('outcome-review');
    const verdict=await runProcess(python,['scripts/review_submission_outcome.py','--evidence',evidencePath,
@@ -109,6 +84,15 @@ export async function runReviewedSubmission(config){
    if(!verdict.approved)return {status:'submission_unknown',issues:verdict.issues};
    journal=await acceptReviewedSubmissionOutcome({session,runDirectory:run,phase,review:await read(output)});
    if(journal.status==='submitted')return await successful(journal);
+   if(journal.status==='awaiting_confirmation_review' && phase==='submit'){
+    if(journal.click_returned!==true)return {status:'submission_unknown'};
+    const original=await save('original-submit-plan',journal.plan);
+    const gate=await reviewPlan('confirm',await captureSubmissionEvidence(session),original);
+    if(!gate.verdict.approved)return {status:'independent_preview_review_blocked',issues:gate.verdict.issues};
+    confirm=await dispatchReviewedSubmission({session,runDirectory:run,plan:gate.plan,
+     getSummary:()=>command(['status','--run-dir',run])});
+    continue;
+   }
    return {status:journal.status};
   }
   return {status:'submission_unknown'};

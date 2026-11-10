@@ -11,7 +11,7 @@
   "education": [
     {
       "record_id": "education-001",
-      "school": null,
+      "school_name": null,
       "major": null,
       "degree": null,
       "education_level": null,
@@ -25,11 +25,12 @@
       "source": null
     }
   ],
-  "internships": [
+  "employment": [
     {
       "record_id": "internship-001",
       "company": null,
       "department": null,
+      "employment_type": null,
       "role": null,
       "location": null,
       "start_date": null,
@@ -135,7 +136,7 @@
       "status": "unknown",
       "note": "尚未填写或确认"
     },
-    "internships": {
+    "employment": {
       "status": "unknown",
       "note": "尚未填写或确认"
     },

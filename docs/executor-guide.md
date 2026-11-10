@@ -73,7 +73,7 @@ node scripts/run_edge_cdp_application.mjs --start --endpoint http://127.0.0.1:93
 
 ## 程序优先与持续学习
 
-- `private/local-config.json` 的 `semantic_model` 固定为用户指定的 `gpt-6-luna`；`knowledge_file` 默认 `private/form-knowledge.json`。`review_model` 同样固定为 `gpt-6-luna`，用于独立内容核验；不修改用户全局 Codex 设置；模型不可用时报告错误，不静默切换。
+- `private/local-config.json` 的 `semantic_model` 由当前用户明确指定，默认 `gpt-6-luna`；`knowledge_file` 默认 `private/form-knowledge.json`。`review_model` 同样由用户明确指定，默认 `gpt-6-luna`，用于独立内容核验；不修改用户全局 Codex 设置；模型不可用时报告错误，不静默切换。
 - 原 JSON 继续作为信息表。知识文件的 `field_map` 保存网站字段到 JSON 来源的关系，`enum_map` 保存下拉等价名称；不存在时视为空库，首个验证成功关系才创建，损坏时明确报错。
 - 知识键包含站点/路径、模块语义和字段语义。重复记录在模块清单中可附 `mapping_context: {module_type, record_collection, record_id}`；未绑定时由批量语义匹配给出绑定并验证唯一性。缓存只保存记录内相对路径，运行时按 `record_id` 重新找位置。数组下标变化不能串用资料。
 - 已知字段先派发，陌生字段同模块集中一次调用 `match_unknown`；模型输出来源指针、转换、依赖、判断依据，不能输出定位脚本或直接操作浏览器。新叫法与条件推理分开记录；例如 `enrolled_no_diploma` 只在明确在读为真时返回否，条件不成立则重新判断，不能倒推已获得证书。
@@ -259,7 +259,7 @@ nodeRepl.write(await playwrightExecutor.runSessionRequest(playwrightSession, 'AB
 
 原生 Playwright 由 `connectEdgeCdp()` 连接已经运行且身份明确的 Edge 页面，再调用 `createNativePlaywrightSession(page, identity)`。项目不会自行启动 Edge，也不会尝试从普通 Edge 进程复制登录态。普通 Edge 若没有启用远程调试端口，原生 Playwright 无法事后直接接管；此时只能重启到独立 CDP 用户目录，或继续使用旧 hosted Session。
 
-映射/核验进程使用 low 推理；本机 application 入口将字段语义匹配和资料核验均显式固定为 `gpt-6-luna`，模型不可用时报告失败，不继承主会话模型。历史单模块入口未指定模型时也默认使用 Luna。模型调用耗时分别记入 `mapping_seconds` 和 `review_seconds`，不与浏览器耗时混为一谈。
+映射/核验进程使用 low 推理；本机 application 入口从 private/local-config.json 读取用户明确指定的语义与核验模型，默认 `gpt-6-luna`，模型不可用时报告失败，不继承主会话模型。历史单模块入口未指定模型时也默认使用 Luna。模型调用耗时分别记入 `mapping_seconds` 和 `review_seconds`，不与浏览器耗时混为一谈。
 
 ### Codex 模型工作线程的 WebSocket 超时
 
@@ -398,11 +398,11 @@ Moka 下拉规则同时支持 Select common-item 与 Menu pointer 行；选项�
 
 原生 Playwright 驱动默认开启 `--control-agent on`，可以独立用 `--control-agent off` 关闭。它与 `--agent-tuning` 分开：后者控制字段答案的语义处理，前者只处理操作方法。两者都关才完全不调用模型。
 
-程序停止于控件异常时，先通过原执行器重新读取当前模块，再查询 `private/control-recipes.json`。已验证结构命中直接复用；未命中时调用 `gpt-6-luna`，只发送字段标识、标签、控件结构和允许的方法列表，不发送整份简历或字段答案。来源仍由程序从映射库和当前 `record_id` 解析。模型返回的未知方法进入 `handler_implementation_required` 队列，由开发 Agent 补充识别、执行与验证代码；不会直接运行模型返回的任意脚本。
+程序停止于控件异常时，先通过原执行器重新读取当前模块，再查询 `private/control-recipes.json`。已验证结构命中直接复用；未命中时调用本机配置指定的独立模型，只发送字段标识、标签、控件结构和允许的方法列表，不发送整份简历或字段答案。来源仍由程序从映射库和当前 `record_id` 解析。模型返回的未知方法进入 `handler_implementation_required` 队列，由开发 Agent 补充识别、执行与验证代码；不会直接运行模型返回的任意脚本。
 
 已有方法经同一主图的 `apply-control` 和同一 Playwright 会话执行。调用已结束、控件回读成功且 `committed=true` 才写入操作库；候选选择不算学习成功。库中只存结构、适配器名称和验证命令编号，不存个人答案、数组下标或 DOM 选择器。每次执行仍现场检查结构。控件成功后重新读取当前模块再继续；保存未确认或调用未结束时不借此重放动作。
 
-每次运行最多三轮异常处理，同一标签、来源、方法不重复派发。紧凑请求及决定保存在运行目录的 `control-agent/`，区分 `gpt-6-luna` 与 `program_recipe`。完全新增的操作实现仍需要开发 Agent 处理，此入口不是通用的无人监督代码生成器。
+每次运行最多三轮异常处理，同一标签、来源、方法不重复派发。紧凑请求及决定保存在运行目录的 `control-agent/`，区分实际模型调用与 `program_recipe`。完全新增的操作实现仍需要开发 Agent 处理，此入口不是通用的无人监督代码生成器。
 
 首个现场验证案例是 Alibaba/Fusion 的月份区间：识别 `.next-range-picker` 双端点，打开所属弹层，填写两个 `YYYY-MM` 输入，确认后同时回读两端。弹层可能被限制在视口内并覆盖触发器，因此以唯一展开的所属控件和弹层结构核验归属，不能假设固定上下间距。正确日期按月份核对后跳过；日历不会执行“下拉选第一个”的兜底。控件回读成功与整个简历已保存是不同状态。
 
@@ -437,10 +437,19 @@ Moka 下拉规则同时支持 Select common-item 与 Menu pointer 行；选项�
 
 `node scripts/run_reviewed_submission.mjs CONFIG_JSON` 连续执行已完成表单的上述正式提交流程；已派发阶段只读回查，不重复点击。原网站成功文案先现场定位，再交独立 Luna 核验，经过原 supervisor 确认才写成功台账。重复读取已有成功记录不会增加 `new_submissions`，成功页面确认后关闭。当前连续适配覆盖已观察的 Moka 预览、确认和成功文案；其他网站保留为待适配。
 
-正式提交使用 `node scripts/run_edge_submission.mjs capture PAGE_ID RUN_DIRECTORY EVIDENCE_JSON` 捕获当前完整申请；独立 `gpt-6-luna` 核验原始资料、官方岗位资格、账号投递历史和实际字段后，生成绑定快照的 plan。`dispatch PAGE_ID RUN_DIRECTORY PLAN_JSON` 在派发前落盘并保留阶段锁。需要预览确认的网站分别使用 `phase:submit` 和 `phase:confirm`，最终按钮必须现场观察且单独复核。首次未知结果可使用 `outcome_mode:independent_observation`，不猜成功文案；实际返回页经独立复核后通过 `accept-outcome PAGE_ID RUN_DIRECTORY REVIEW_JSON` 记录确认页或明确成功。滑块留待本人完成，`reconcile PAGE_ID RUN_DIRECTORY confirm` 只读核对，不重复点击。
+正式提交使用 `node scripts/run_edge_submission.mjs capture PAGE_ID RUN_DIRECTORY EVIDENCE_JSON` 捕获当前完整申请；独立的用户指定模型核验原始资料、官方岗位资格、账号投递历史和实际字段后，生成绑定快照的 plan。`dispatch PAGE_ID RUN_DIRECTORY PLAN_JSON` 在派发前落盘并保留阶段锁。需要预览确认的网站分别使用 `phase:submit` 和 `phase:confirm`，最终按钮必须现场观察且单独复核。首次未知结果可使用 `outcome_mode:independent_observation`，不猜成功文案；实际返回页经独立复核后通过 `accept-outcome PAGE_ID RUN_DIRECTORY REVIEW_JSON` 记录确认页或明确成功。滑块留待本人完成，`reconcile PAGE_ID RUN_DIRECTORY confirm` 只读核对，不重复点击。
 
 只有 `blocked_before_dispatch` 且不存在派发记录或点击结果的预检失败，才能用 `release-preflight PAGE_ID RUN_DIRECTORY PHASE` 释放预留锁；旧失败日志保留。已派发或未知结果无法释放该锁。只有真实网站成功证据才计入新投递数。
 
 飞书招聘的空白经历卡片支持程序添加和数量回读。修复识别后可用 `capture_edge_inventory.mjs PAGE_ID INVENTORY_JSON` 只读捕获，再沿原 run 使用 `application_cli extend-inventory` 扩展尚未写入的新栏目。已有填写、经历新增或保存未知先恢复原记录，不能重新 start。纯模型复核节点可使用受限的 `resume-pure-review`，驱动自动恢复该节点，不重放浏览器动作。
 
 识别规则库 `browser/rules/`、控件库 `browser/controls/`、注册表 `edge_form_graph/control_catalog.json` 已分离。现有 15 个执行入口由注册表关联，JS 导入表自动生成。控件目标、执行回执、核验跳过及新增驱动流程见 [控件能力契约](control-contract.md)。本节中的最新用户规则优先于旧版保密值路径及必须完整回读的描述。
+
+
+## 首次简历导入与通用提交候选
+
+新用户先按 [简历导入](../references/resume-onboarding.md) 上传自己的简历，提取有来源的客观事实，核对版面、条目、冲突与缺项，再初始化配置。PDF 辅助读取依赖 resume extra；图片/扫描页需要宿主视觉能力或可用 OCR。提取工具只输出源文和位置，不把空文本推断成没有经历。
+
+连续正式提交入口从当前页面读取真实按钮作为候选，不再固定某个站点的预览 CSS 类或唯一成功文案。独立模型只能选择候选 ID，程序据此绑定实际选择器、按钮文案和快照；成功与确认候选分开。候选仅提供审查线索，不授予提交权限；模糊、缺失或失败结果保留 unknown，不重复点击。任意多页导航、iframe、shadow DOM 等未适配结构仍需交接。
+
+密码、Cookie、令牌、API key 和验证码从资料模型输入与 DOM 快照排除，编译器拒绝凭证来源映射；姓名、联系方式和用户已授权的证件事实仍按当前授权处理。新模板采用 school_name 与 employment；旧 school/internships 保留读取兼容。学校相异或缺少足够身份依据时不绑定为同一记录。

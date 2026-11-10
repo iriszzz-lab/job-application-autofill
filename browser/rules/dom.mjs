@@ -17,7 +17,7 @@ export function readModuleDOM({moduleSelector, saveControl = null, saveLabel = n
   };
   const blockingDialogs=[...document.querySelectorAll('[role="dialog"],.el-dialog,.el-message-box')]
     .filter(el=>visible(el)&&el!==root&&!el.contains(root));
-  const protectedRE = /(?!)/; // Personal fields use the ordinary value path.
+  const protectedRE = /(?:password|passwd|\bpwd\b|cookies?|\btoken\b|access[_ -]?token|refresh[_ -]?token|api[_ -]?key|client[_ -]?secret|authorization|\botp\b|verification[_ -]?code|密码|口令|验证码|令牌|密钥)/i;
   const text = el => el?.textContent?.trim() || '';
   const labelOf = el => {
     const gradeProof=el.type==='file'&&el.closest('.grade-prove__wrapper');

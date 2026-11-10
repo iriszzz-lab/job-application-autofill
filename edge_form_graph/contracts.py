@@ -14,9 +14,11 @@ class ContractError(ValueError):
 
 KINDS = {"text", "checkbox", "radio", "radio_group", "select", "combobox", "file"}
 TRANSFORMS = {"identity", "string", "yes_no", "not_yes_no", "present_absent", "not_bool", "join_text", "join_location", "year_month", "date_year", "date_month", "enrolled_no_diploma", "normalize_exam_level", "age_from_birth_date", "none_string_no", "explicit_none_text", "degree_category", "education_category", "last_clause", "address_city", "china_city_path"}
-# User policy: supplied personal values use the ordinary value path.
-# Keep this compatibility symbol for old imports; it no longer classifies fields.
-SENSITIVE = re.compile(r"(?!)")
+# Credentials are excluded; authorized resume facts and identity values remain usable.
+SENSITIVE = re.compile(
+    r"(?:^|[/~_.\s-])(?:password|passwd|pwd|cookie|cookies|token|(?:access|refresh|auth|bearer)[_ -]?token|"
+    r"api[_ -]?key|client[_ -]?secret|secret|authorization|otp|verification[_ -]?code)(?:$|[/~_.\s-])|"
+    r"密码|口令|验证码|令牌|密钥", re.I)
 
 
 def file_matches(field, value):
@@ -230,6 +232,8 @@ def compile_plan(profile, snapshot, proposal):
         f = fields[fid]
         if f["kind"] not in KINDS or not f.get("selector") or (f.get("disabled") and not item["depends_on"]):
             raise ContractError("field_not_writable")
+        if f.get("protected") or SENSITIVE.search(str(f.get("label", ""))):
+            raise ContractError("credential_field_not_writable")
         effective_source = item["source"]
         if f.get('control_pattern') == 'ud_date_pair' and f.get('range_endpoint') in {'start','end'}:
             from .knowledge import resolve_record
@@ -400,6 +404,8 @@ def page_matches(operations, snapshot):
 
 def redacted_profile(profile):
     if isinstance(profile, dict):
+        if profile.get("protected") is True or SENSITIVE.search(str(profile.get("label", ""))):
+            profile = {**profile, "value": None} if "value" in profile else profile
         return {k: redacted_profile(v) for k, v in profile.items() if not SENSITIVE.search(k)}
     if isinstance(profile, list):
         return [redacted_profile(v) for v in profile]

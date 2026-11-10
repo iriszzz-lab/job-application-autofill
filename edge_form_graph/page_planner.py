@@ -8,29 +8,36 @@ from pathlib import Path
 
 
 def collection_kind(label, scope_label=''):
-    if '教育' in label or '学历' in label:
+    if '教育' in label or '学历' in label or re.search(r'\beducation\b', label, re.I):
         return 'education'
-    if '论文' in label:
+    if '论文' in label or re.search(r'\b(?:research|publications?)\b', label, re.I):
         return 'research'
-    if '语言' in label:
+    if '语言' in label or re.search(r'\blanguages?\b', label, re.I):
         return 'languages'
     if '实习' in scope_label and '项目' in scope_label:
         return 'combined_experience'
-    if '项目' in label:
+    if '项目' in label or re.search(r'\bprojects?\b', label, re.I):
         return 'projects'
-    if any(word in label for word in ('实习', '工作')):
+    if any(word in label for word in ('实习', '工作')) or re.search(r'\b(?:work experience|employment|internships?)\b', label, re.I):
         return 'employment'
     return None
 
 
 def records_for(profile, kind, label):
     included, excluded = [], []
-    collections = ['employment', 'projects'] if kind == 'combined_experience' else [kind]
+    collections = ['employment', 'internships', 'projects'] if kind == 'combined_experience' else ['employment', 'internships'] if kind == 'employment' else [kind]
     employment_ids = {r['record_id'] for r in profile.get('employment', [])
                       if r.get('autofill_policy', {}).get('include_by_default') is not False}
+    seen_employment_ids = set()
     for collection in collections:
         for record in profile.get(collection, []):
             rid = record['record_id']
+            if collection in {'employment', 'internships'}:
+                if rid in seen_employment_ids:
+                    raise ValueError('duplicate_employment_record_id')
+                seen_employment_ids.add(rid)
+            if kind == 'education' and record.get('school') and record.get('school_name') and record['school'] != record['school_name']:
+                raise ValueError('conflicting_school_aliases')
             reason = None
             if record.get('autofill_policy', {}).get('include_by_default') is False:
                 reason = 'excluded_by_user_policy'
@@ -146,6 +153,10 @@ def row_match(row, candidates, kind=None):
             evidence=0;compatible=True
             for key,value in observed.items():
                 canonical=record.get(key)
+                if key == 'school_name':
+                    canonical = canonical or record.get('school')
+                    if not canonical:
+                        compatible=False;break
                 if not canonical:continue
                 left=_education_level(value) if key=='education_level' else _month(value) if key.endswith('_date') else value
                 right=_education_level(canonical) if key=='education_level' else _month(canonical) if key.endswith('_date') else str(canonical).strip()

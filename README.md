@@ -6,7 +6,7 @@
 
 ## 安装主 skill
 
-需要 Git、Python 3.11+、Node.js（原项目在 Node.js 24 验证）、Microsoft Edge，以及可用且已登录的 Codex CLI。陌生字段及独立模型核验默认使用 `gpt-6-luna`；目标宿主必须提供实际模型/子代理能力。能力不可用时应报告阻塞，不能声称核验已完成。依赖安装可能联网，模型调用可能产生费用。
+需要 Git、Python 3.11+、Node.js（原项目在 Node.js 24 验证）、Microsoft Edge，以及可用且已登录的 Codex CLI。陌生字段及独立模型核验默认使用 `gpt-6-luna`；用户可在本机配置中明确选择自己账号可用的模型，目标宿主必须提供实际模型/子代理能力。能力不可用时应报告阻塞，不能声称核验已完成。依赖安装可能联网，模型调用可能产生费用。
 
 macOS/Linux：
 
@@ -16,7 +16,7 @@ git clone https://github.com/iriszzz-lab/job-application-autofill.git "$HOME/.ag
 cd "$HOME/.agents/skills/job-application-autofill"
 python3.12 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -e .
+.venv/bin/python -m pip install -e ".[resume]"
 npm ci
 ```
 
@@ -28,7 +28,7 @@ git clone https://github.com/iriszzz-lab/job-application-autofill.git $skillDir
 Set-Location $skillDir
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\python.exe -m pip install -e ".[resume]"
 npm ci
 ```
 
@@ -36,9 +36,23 @@ npm ci
 
 安装后调用 `$job-application-autofill`；如未发现，重启宿主。源目录就是 skill 和执行项目，无需另找外部程序。更新时在此目录运行 `git pull --ff-only`，不要用模板覆盖已有私有状态。
 
-## 准备自己的资料
+## 第一次使用：上传自己的简历
 
-将 [空白资料模板](templates/autofill-profile.template.json) 复制到仓库外的私有工作目录，填写有来源的事实，删除不用的占位记录。未知值保留 `null`，更新 `field_metadata`，完成本人核对后设 `example_only: false`。参见 [资料格式](references/profile-format.md)；[虚构示例](examples/autofill-profile.example.json) 只供理解格式。
+新用户直接在聊天中上传自己的 PDF、DOCX、TXT/Markdown 或图片简历，也可以指定本地路径，例如：
+
+> 使用 $job-application-autofill。我已上传自己的简历，请先识别全部内容，按客观事实建立我的私有资料，列出无法辨认、冲突和缺失信息。暂不操作招聘网站。
+
+AI 按 [简历导入流程](references/resume-onboarding.md) 识别不同版式、中英文标题和多页经历，并生成规范 JSON。PDF 与 DOCX 辅助提取命令为：
+
+```sh
+.venv/bin/python scripts/prepare_resume.py --input /absolute/private/resume.pdf --output /absolute/private/resume-source.json
+```
+
+Windows 将 Python 路径替换为 `.venv\Scripts\python.exe`。提取结果只保留源文和位置，不直接宣布事实已核验。扫描 PDF、图片或复杂双栏由宿主视觉读取或可用 OCR 辅助，逐页核对；没有这些能力时明确交接，不能假装已读。旧 DOC 请使用可用转换工具，或另存 PDF/DOCX。
+
+事实保留文件、页码/段落和原文引文；缺失用 null，不编造日期、成果、奖项或资格。用户只需核对摘要并补充真正缺失的信息，不必手工填写整份 JSON。上传简历只用于整理资料，网站填写、暂存和提交仍按你的当前授权进行。个人资料及原简历保存在仓库之外。
+
+也支持复用已有 JSON，或使用 [空白模板](templates/autofill-profile.template.json)。规范字段为 `education[].school_name`、`employment[]`；旧资料的 `school` 与 `internships` 保持兼容。删除不用的占位记录，核对来源后设置 `example_only: false`。细节见 [资料格式](references/profile-format.md)。
 
 资料准备好后，在仓库根目录执行（替换为自己的绝对路径）：
 
@@ -53,6 +67,8 @@ npm ci
 .\.venv\Scripts\python.exe scripts/init_local_config.py --profile 'C:\your-private-folder\autofill-profile.json'
 .\.venv\Scripts\python.exe scripts/resolve_config.py
 ```
+
+需要其他模型时，初始化命令可增加 `--semantic-model <实际模型名> --review-model <实际模型名>`，或修改已有 `private/local-config.json` 的对应键；不会自动回退到另一模型。
 
 初始化仅创建忽略提交的 `config.local.json`、`private/local-config.json` 和空白 `private/form-knowledge.json`，拒绝覆盖已有配置或映射，也不连接浏览器。已有用户直接修改自己的配置，按 [本机配置与迁移](references/installation-config.md) 核对。运行记录使用配置解析的 `prior_root`（默认 `private/`），个人简历附件和资料留在仓库外。
 

@@ -30,8 +30,8 @@ def local_path(value, *, writable=False):
 def review_model():
     config=local_config()
     model = config.get('review_model', 'gpt-6-luna')
-    if model != 'gpt-6-luna':
-        raise ValueError('review_model_must_be_user_selected_gpt6_luna')
+    if not isinstance(model, str) or not model.strip() or model in {'program', 'main'}:
+        raise ValueError('review_model_must_be_explicit_model_name')
     timeout=config.get('review_timeout_seconds',600)
     if type(timeout) is not int or not 60<=timeout<=600:
         raise ValueError('review_timeout_seconds_out_of_range')
@@ -41,8 +41,8 @@ def review_model():
 def components():
     config = local_config()
     model = config.get('semantic_model', 'gpt-6-luna')
-    if model != 'gpt-6-luna':
-        raise ValueError('semantic_model_must_be_user_selected_gpt6_luna')
+    if not isinstance(model, str) or not model.strip() or model in {'program', 'main'}:
+        raise ValueError('semantic_model_must_be_explicit_model_name')
     timeout=config.get('semantic_timeout_seconds',600)
     if type(timeout) is not int or not 60<=timeout<=600:
         raise ValueError('semantic_timeout_seconds_out_of_range')

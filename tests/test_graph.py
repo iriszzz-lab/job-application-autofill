@@ -169,11 +169,10 @@ class GraphTests(unittest.TestCase):
         with self.assertRaises(ContractError):
             compile_plan({"school": "示例大学"}, s, p)
 
-    def test_personal_source_uses_ordinary_value_path(self):
+    def test_credential_source_cannot_be_used_as_resume_fact(self):
         p = Model().map({}, {}); p["mappings"][0]["source"] = "/password"
-        operations, deferred = compile_plan({"password": "test"}, snapshot(), p)
-        self.assertEqual(operations[0]['value'], 'test')
-        self.assertEqual(deferred, [])
+        with self.assertRaises(ContractError):
+            compile_plan({"password": "test"}, snapshot(), p)
 
     def test_stale_snapshot_rejected(self):
         s = snapshot(); s["observed_at"] -= 301

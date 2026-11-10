@@ -27,7 +27,7 @@ export function readPageInventory() {
     all.forEach(el=>owned.add(el));
     const label=(root.querySelector('[class*="formCardHeader"],legend,h2,h3')?.textContent||root.getAttribute('aria-label')||`表单 ${index+1}`).trim();
     const buttons=[...root.querySelectorAll('button,[role="button"],[class*="PCButton--pcButton--"]')].filter(visible);
-    const save=buttons.filter(el=>/^(保存|保存并下一步|下一步并保存|下一步)$/.test(el.textContent.trim()));
+    const save=buttons.filter(el=>/^(保存|保存并下一步|下一步并保存|下一步|save|save resume|save and continue)$/i.test(el.textContent.trim()));
     const edit=buttons.find(el=>el.textContent.trim()==='编辑');
     const groups=[...root.querySelectorAll('.table-field-layout-tiled')].filter(visible).map(group=>{
       let container=group.parentElement;
